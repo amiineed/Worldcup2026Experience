@@ -1,18 +1,8 @@
 import { useState, useEffect, createContext, useContext } from 'react';
-import { Navbar } from './components/Navbar';
-import { HeroSection } from './components/HeroSection';
-import { ExperienceSection } from './components/ExperienceSection';
-import { MomentsSection } from './components/MomentsSection';
-import { TournamentSection } from './components/TournamentSection';
-import { LegendaryMomentsSection } from './components/LegendaryMomentsSection';
-import { StatsSection } from './components/StatsSection';
-import { PredictionsSection } from './components/PredictionsSection';
-import { CommunitySection } from './components/CommunitySection';
-import { FanInteractionSection } from './components/FanInteractionSection';
-import { Footer } from './components/Footer';
+import { RouterProvider } from 'react-router';
+import { router } from './routes';
 import { FootballLoader } from './components/UIEnhancements';
-import { MessiEasterEgg } from './components/MessiEasterEgg';
-import { GoalToast } from './components/GoalToast';
+import { Toaster } from 'sonner';
 
 interface AppContextType {
   isDarkMode: boolean;
@@ -54,23 +44,8 @@ export default function App() {
 
   return (
     <AppContext.Provider value={{ isDarkMode, setIsDarkMode, isLoggedIn, setIsLoggedIn }}>
-      <div className={`min-h-screen transition-colors duration-500 ${isDarkMode ? 'bg-[#0b0b0b] text-white' : 'bg-white text-gray-900'}`}>
-        <Navbar />
-        <main className="pt-[72px]">
-          <HeroSection />
-          <ExperienceSection />
-          <MomentsSection />
-          <TournamentSection />
-          <LegendaryMomentsSection />
-          <StatsSection />
-          <PredictionsSection />
-          <CommunitySection />
-          {isLoggedIn && <FanInteractionSection />}
-        </main>
-        <Footer />
-        <MessiEasterEgg />
-        <GoalToast />
-      </div>
+      <RouterProvider router={router} />
+      <Toaster position="top-right" richColors />
     </AppContext.Provider>
   );
 }

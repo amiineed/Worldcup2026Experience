@@ -1,9 +1,11 @@
-import { Trophy, Globe, Menu, Sun, Moon } from 'lucide-react';
+import { Trophy, Globe, Menu, Sun, Moon, User, LogOut, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { LoginModal } from './LoginModal';
 import { useAppContext } from '../App';
 import { motion, AnimatePresence } from 'motion/react';
+import { supabase } from '../lib/supabase';
+import { toast } from 'sonner';
 
 const navLinks = [
   { href: '#experience', label: 'Expérience' },
@@ -16,7 +18,21 @@ export function Navbar() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('');
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const { isDarkMode, setIsDarkMode, isLoggedIn, setIsLoggedIn } = useAppContext();
+
+  // Close profile menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -51,6 +67,26 @@ export function Navbar() {
   const handleLoginSuccess = () => {
     setIsLoggedIn(true);
     setIsLoginOpen(false);
+  };
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await supabase.auth.signOut();
+      setIsLoggedIn(false);
+      setIsProfileMenuOpen(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      toast.success('Déconnexion réussie', {
+        description: 'À bientôt sur World Cup 2026 !',
+      });
+    } catch (err: any) {
+      console.error('Logout error:', err);
+      toast.error('Erreur lors de la déconnexion', {
+        description: err.message || 'Veuillez réessayer.',
+      });
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -132,9 +168,82 @@ export function Navbar() {
             </Button>
 
             {isLoggedIn ? (
-              <div className="flex items-center gap-2 bg-gradient-to-r from-[#d72638] to-[#1b3c88] text-white rounded-full px-5 py-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                <span className="text-sm">En ligne</span>
+              <div className="relative" ref={profileMenuRef}>
+                <button
+                  onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                  className={`flex items-center gap-2 rounded-full pl-1 pr-3 py-1 transition-all duration-300 hover:scale-105 ${
+                    isDarkMode
+                      ? 'bg-white/10 hover:bg-white/20'
+                      : 'bg-gray-100 hover:bg-gray-200'
+                  }`}
+                >
+                  <div className="w-8 h-8 bg-gradient-to-br from-[#d72638] to-[#1b3c88] rounded-full flex items-center justify-center">
+                    <User className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isProfileMenuOpen ? 'rotate-180' : ''} ${isDarkMode ? 'text-white/70' : 'text-gray-600'}`} />
+                </button>
+
+                <AnimatePresence>
+                  {isProfileMenuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className={`absolute right-0 mt-2 w-56 rounded-xl shadow-xl border overflow-hidden z-50 ${
+                        isDarkMode
+                          ? 'bg-[#1a1a1a] border-white/10'
+                          : 'bg-white border-gray-200'
+                      }`}
+                    >
+                      <div className={`px-4 py-3 border-b ${isDarkMode ? 'border-white/10' : 'border-gray-100'}`}>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gradient-to-br from-[#d72638] to-[#1b3c88] rounded-full flex items-center justify-center">
+                            <User className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <div className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Fan connecté</div>
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-1.5 h-1.5 bg-green-400 rounded-full" />
+                              <span className={`text-xs ${isDarkMode ? 'text-white/50' : 'text-gray-500'}`}>En ligne</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="py-1">
+                        <button
+                          onClick={() => {
+                            setIsProfileMenuOpen(false);
+                            toast('Mon Profil', { description: 'Fonctionnalité disponible prochainement 🚀' });
+                          }}
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                            isDarkMode
+                              ? 'text-white/80 hover:bg-white/10'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <User className="w-4 h-4" />
+                          Mon Profil
+                        </button>
+
+                        <div className={`mx-3 border-t ${isDarkMode ? 'border-white/10' : 'border-gray-100'}`} />
+
+                        <button
+                          onClick={handleLogout}
+                          disabled={isLoggingOut}
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-red-500 ${
+                            isDarkMode ? 'hover:bg-red-500/10' : 'hover:bg-red-50'
+                          } disabled:opacity-50`}
+                        >
+                          <LogOut className={`w-4 h-4 ${isLoggingOut ? 'animate-spin' : ''}`} />
+                          {isLoggingOut ? 'Déconnexion...' : 'Déconnexion'}
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             ) : (
               <Button
