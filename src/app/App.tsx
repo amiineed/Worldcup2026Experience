@@ -13,7 +13,6 @@ import { Footer } from './components/Footer';
 import { FootballLoader } from './components/UIEnhancements';
 import { MessiEasterEgg } from './components/MessiEasterEgg';
 import { GoalToast } from './components/GoalToast';
-import { supabase } from '../lib/supabase';
 
 interface AppContextType {
   isDarkMode: boolean;
@@ -39,22 +38,6 @@ export default function App() {
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 2000);
     return () => clearTimeout(timer);
-  }, []);
-
-  // Check authentication state on mount and listen for changes
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setIsLoggedIn(!!session);
-    };
-
-    checkAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsLoggedIn(!!session);
-    });
-
-    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {

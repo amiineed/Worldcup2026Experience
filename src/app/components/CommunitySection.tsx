@@ -2,9 +2,12 @@ import { MapPin, ArrowRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAppContext } from '../App';
 import { ScrollAnimationWrapper } from './ScrollAnimations';
+import { useState } from 'react';
+import { CommunityModal } from './CommunityModal';
 
 export function CommunitySection() {
   const { isDarkMode } = useAppContext();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
     <section id="community" className={`py-24 relative overflow-hidden transition-colors duration-500 ${isDarkMode ? 'bg-[#0b0b0b]' : 'bg-[#f4f2ee]'}`}>
@@ -37,6 +40,7 @@ export function CommunitySection() {
             </div>
 
             <Button
+              onClick={() => setIsModalOpen(true)}
               size="lg"
               className="bg-[#1b3c88] hover:bg-[#152e6b] text-white px-8 py-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 group"
             >
@@ -88,6 +92,7 @@ export function CommunitySection() {
           </ScrollAnimationWrapper>
         </div>
       </div>
+      <CommunityModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </section>
   );
 }
