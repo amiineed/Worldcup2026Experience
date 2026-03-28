@@ -1,31 +1,120 @@
-import { X, Mail, Lock, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, Mail, Lock, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { supabase } from '../../lib/supabase';
+import { createUserProfile } from '../../lib/user-profiles';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: () => void; 
 }
 
 export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [status, setStatus] = useState<'idle' | 'error' | 'success'>('idle');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [status, setStatus] = useState<'idle' | 'error' | 'success' | 'loading'>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isSignup, setIsSignup] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [signupSuccess, setSignupSuccess] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
+    if (!email || !password || (isSignup && !confirmPassword)) {
       setStatus('error');
+      setErrorMessage(isSignup ? 'Veuillez remplir tous les champs' : 'Veuillez remplir tous les champs');
       return;
     }
-    setStatus('success');
-    setTimeout(() => {
-      onSuccess?.();
-      setStatus('idle');
-      setEmail('');
-      setPassword('');
-    }, 1500);
+
+    if (isSignup && password !== confirmPassword) {
+      setStatus('error');
+      setErrorMessage('Les mots de passe ne correspondent pas');
+      return;
+    }
+
+    setStatus('loading');
+    setErrorMessage('');
+
+    try {
+      let result;
+      if (isSignup) {
+        result = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: window.location.origin,
+            data: {
+              email_confirm: true // Disable email confirmation
+            }
+          }
+        });
+
+        // If signup is successful, create user profile and log in immediately
+        if (!result.error && result.data.user) {
+          await createUserProfile(result.data.user.id, email);
+          
+          // Automatically log in the user after signup
+          const loginResult = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          
+          if (!loginResult.error) {
+            setStatus('success');
+            setSignupSuccess(true);
+            setTimeout(() => {
+              onSuccess?.();
+              setStatus('idle');
+              setEmail('');
+              setPassword('');
+              setConfirmPassword('');
+              setErrorMessage('');
+              setSignupSuccess(false);
+            }, 1500);
+            return;
+          }
+        }
+      } else {
+        result = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+      }
+
+      const { data, error } = result;
+
+      if (error) {
+        setStatus('error');
+        setErrorMessage(error.message);
+        return;
+      }
+
+      setStatus('success');
+      setTimeout(() => {
+        onSuccess?.();
+        setStatus('idle');
+        setEmail('');
+        setPassword('');
+        setConfirmPassword('');
+        setErrorMessage('');
+      }, 1500);
+    } catch (error) {
+      setStatus('error');
+      setErrorMessage('Une erreur est survenue');
+    }
+  };
+
+  const toggleMode = () => {
+    setIsSignup(!isSignup);
+    setStatus('idle');
+    setErrorMessage('');
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setSignupSuccess(false);
   };
 
   return (
@@ -61,8 +150,8 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
               </button>
 
               <div className="relative">
-                <h2 className="text-3xl mb-2">Connexion</h2>
-                <p className="text-white/80">Accédez à votre espace fan</p>
+                <h2 className="text-3xl mb-2">{isSignup ? 'Inscription' : 'Connexion'}</h2>
+                <p className="text-white/80">{isSignup ? 'Créez votre espace fan' : 'Accédez à votre espace fan'}</p>
               </div>
             </div>
 
@@ -88,28 +177,64 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     id="password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-[#1b3c88] focus:outline-none focus:ring-2 focus:ring-[#1b3c88]/20 transition-all"
+                    className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-lg focus:border-[#1b3c88] focus:outline-none focus:ring-2 focus:ring-[#1b3c88]/20 transition-all"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
                 </div>
               </div>
+
+              {isSignup && (
+                <div>
+                  <label htmlFor="confirmPassword" className="block text-sm text-gray-700 mb-2">Confirmer le mot de passe</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      id="confirmPassword"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-lg focus:border-[#1b3c88] focus:outline-none focus:ring-2 focus:ring-[#1b3c88]/20 transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <AnimatePresence mode="wait">
                 {status === 'error' && (
                   <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
                     className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
                     <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                    <span className="text-sm">Veuillez remplir tous les champs</span>
+                    <span className="text-sm">{errorMessage}</span>
                   </motion.div>
                 )}
                 {status === 'success' && (
                   <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
                     className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700">
                     <CheckCircle className="w-5 h-5 flex-shrink-0" />
-                    <span className="text-sm">Connexion réussie !</span>
+                    <span className="text-sm">
+                      {signupSuccess 
+                        ? 'Compte créé avec succès ! Connexion automatique...' 
+                        : (isSignup ? 'Inscription réussie !' : 'Connexion réussie !')
+                      }
+                    </span>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -120,10 +245,10 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
 
               <button
                 type="submit"
-                disabled={status === 'success'}
+                disabled={status === 'success' || status === 'loading'}
                 className="w-full bg-[#1b3c88] hover:bg-[#152e6b] text-white py-3 rounded-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {status === 'success' ? 'Connexion en cours...' : 'Se connecter'}
+                {status === 'loading' ? (isSignup ? 'Inscription en cours...' : 'Connexion en cours...') : status === 'success' ? (isSignup ? 'Inscription réussie !' : 'Connexion réussie !') : (isSignup ? 'Créer un compte' : 'Se connecter')}
               </button>
 
               <div className="relative">
@@ -150,8 +275,14 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
               </div>
 
               <div className="text-center pt-4 border-t border-gray-100">
-                <span className="text-sm text-gray-600">Vous n'avez pas de compte ? </span>
-                <a href="#" className="text-sm text-[#1b3c88] hover:text-[#d72638] transition-colors">Créer un compte</a>
+                <span className="text-sm text-gray-600">{isSignup ? 'Vous avez déjà un compte ? ' : 'Vous n\'avez pas de compte ? '}</span>
+                <button
+                  type="button"
+                  onClick={toggleMode}
+                  className="text-sm text-[#1b3c88] hover:text-[#d72638] transition-colors underline"
+                >
+                  {isSignup ? 'Se connecter' : 'Créer un compte'}
+                </button>
               </div>
             </form>
           </motion.div>
