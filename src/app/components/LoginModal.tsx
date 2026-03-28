@@ -1,8 +1,9 @@
-import { X, Mail, Lock, AlertCircle, CheckCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { X, Mail, Lock, AlertCircle, CheckCircle, Loader2, ArrowLeft, User } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
 import { sendEmail, emailTemplates } from '../../lib/email';
+import { projectId, publicAnonKey } from '../../../utils/supabase/info';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -10,11 +11,12 @@ interface LoginModalProps {
   onSuccess?: () => void;
 }
 
-type View = 'login' | 'forgot-password';
+type View = 'login' | 'signup' | 'forgot-password';
 
 export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'success'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [view, setView] = useState<View>('login');
@@ -30,6 +32,7 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
   const resetForm = () => {
     setEmail('');
     setPassword('');
+    setName('');
     setStatus('idle');
     setErrorMsg('');
     setResetEmail('');
@@ -150,6 +153,66 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
     }
   };
 
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !email || !password) {
+      setStatus('error');
+      setErrorMsg('Veuillez remplir tous les champs');
+      return;
+    }
+    if (!validateEmail(email)) {
+      setStatus('error');
+      setErrorMsg('Format d\'email invalide');
+      return;
+    }
+    if (password.length < 6) {
+      setStatus('error');
+      setErrorMsg('Le mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+
+    setStatus('loading');
+    try {
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-ad9ffb59/signup`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${publicAnonKey}`,
+          },
+          body: JSON.stringify({ email, password, name }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setStatus('error');
+        setErrorMsg(data.error?.includes('already been registered')
+          ? 'Cet email est déjà utilisé'
+          : `Erreur : ${data.error}`);
+        console.error('Signup error:', data.error);
+        return;
+      }
+      // Auto sign-in after successful signup
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) {
+        setStatus('error');
+        setErrorMsg(`Compte créé mais erreur de connexion : ${signInError.message}`);
+        console.error('Auto sign-in error:', signInError);
+        return;
+      }
+      setStatus('success');
+      setTimeout(() => {
+        onSuccess?.();
+        resetForm();
+      }, 1200);
+    } catch (err: any) {
+      setStatus('error');
+      setErrorMsg(`Erreur inattendue : ${err.message}`);
+      console.error('Signup exception:', err);
+    }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -196,6 +259,11 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
                       <>
                         <h2 className="text-3xl mb-2">Connexion</h2>
                         <p className="text-white/80">Accédez à votre espace fan</p>
+                      </>
+                    ) : view === 'signup' ? (
+                      <>
+                        <h2 className="text-3xl mb-2">Inscription</h2>
+                        <p className="text-white/80">Rejoignez la communauté des fans</p>
                       </>
                     ) : (
                       <>
@@ -329,7 +397,103 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
 
                   <div className="text-center pt-4 border-t border-gray-100">
                     <span className="text-sm text-gray-600">Vous n'avez pas de compte ? </span>
-                    <a href="#" className="text-sm text-[#1b3c88] hover:text-[#d72638] transition-colors">Créer un compte</a>
+                    <button type="button" onClick={() => { setView('signup'); setStatus('idle'); }} className="text-sm text-[#1b3c88] hover:text-[#d72638] transition-colors">Créer un compte</button>
+                  </div>
+                </motion.form>
+              ) : view === 'signup' ? (
+                /* Signup View */
+                <motion.form
+                  key="signup"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.2 }}
+                  onSubmit={handleSignup}
+                  className="p-8 space-y-5"
+                >
+                  <button
+                    type="button"
+                    onClick={() => { setView('login'); setStatus('idle'); }}
+                    className="flex items-center gap-2 text-sm text-[#1b3c88] hover:text-[#d72638] transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Retour à la connexion
+                  </button>
+
+                  <div>
+                    <label htmlFor="signup-name" className="block text-sm text-gray-700 mb-2">Nom complet</label>
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        id="signup-name"
+                        type="text"
+                        value={name}
+                        onChange={(e) => { setName(e.target.value); setStatus('idle'); }}
+                        placeholder="Votre nom"
+                        className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-[#1b3c88] focus:outline-none focus:ring-2 focus:ring-[#1b3c88]/20 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="signup-email" className="block text-sm text-gray-700 mb-2">Adresse email</label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        id="signup-email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => { setEmail(e.target.value); setStatus('idle'); }}
+                        placeholder="vous@exemple.com"
+                        className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-[#1b3c88] focus:outline-none focus:ring-2 focus:ring-[#1b3c88]/20 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="signup-password" className="block text-sm text-gray-700 mb-2">Mot de passe</label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        id="signup-password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => { setPassword(e.target.value); setStatus('idle'); }}
+                        placeholder="Minimum 6 caractères"
+                        className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-[#1b3c88] focus:outline-none focus:ring-2 focus:ring-[#1b3c88]/20 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <AnimatePresence mode="wait">
+                    {status === 'error' && (
+                      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+                        className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+                        <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                        <span className="text-sm">{errorMsg}</span>
+                      </motion.div>
+                    )}
+                    {status === 'success' && (
+                      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+                        className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700">
+                        <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                        <span className="text-sm">Compte créé avec succès !</span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <button
+                    type="submit"
+                    disabled={status === 'loading' || status === 'success'}
+                    className="w-full bg-[#d72638] hover:bg-[#b91d2e] text-white py-3 rounded-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {status === 'loading' && <Loader2 className="w-5 h-5 animate-spin" />}
+                    {status === 'loading' ? 'Création...' : status === 'success' ? 'Bienvenue !' : "S'inscrire"}
+                  </button>
+
+                  <div className="text-center pt-4 border-t border-gray-100">
+                    <span className="text-sm text-gray-600">Déjà un compte ? </span>
+                    <button type="button" onClick={() => { setView('login'); setStatus('idle'); }} className="text-sm text-[#1b3c88] hover:text-[#d72638] transition-colors">Se connecter</button>
                   </div>
                 </motion.form>
               ) : (
