@@ -2,7 +2,7 @@ import { X, Mail, Lock, AlertCircle, CheckCircle, Loader2, ArrowLeft, User } fro
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
-import { sendEmail, emailTemplates } from '../../lib/email';
+import { forgotPassword } from '../lib/auth';
 import { projectId, publicAnonKey } from '../../../utils/supabase/info';
 
 interface LoginModalProps {
@@ -102,23 +102,18 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
     try {
       // Generate a reset token (you should implement proper token generation)
       const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      const resetLink = `${window.location.origin}/reset-password?token=${resetToken}&email=${encodeURIComponent(resetEmail)}`;
       
-      // Send email using your custom service
-      const emailResult = await sendEmail({
-        to: resetEmail,
-        ...emailTemplates.passwordReset(resetLink)
-      });
-
-      if (!emailResult.success) {
+      // Use the new forgot password API
+      const result = await forgotPassword(resetEmail);
+      
+      if (!result.success) {
         setResetStatus('error');
-        setResetError('Erreur lors de l\'envoi de l\'email');
-        console.error('Email send error:', emailResult.error);
+        setResetError(result.error || 'Erreur lors de l\'envoi de l\'email');
+        console.error('Email send error:', result.error);
         return;
       }
 
-      // Store the reset token in Supabase or your database
-      // This is a simplified version - you should implement proper token storage
+      // Store the reset token for compatibility with existing code
       const { error: dbError } = await supabase
         .from('password_resets')
         .insert([{ email: resetEmail, token: resetToken, expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000) }]);

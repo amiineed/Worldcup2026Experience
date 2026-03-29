@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router';
 import { router } from './routes';
 import { FootballLoader } from './components/UIEnhancements';
 import { Toaster } from 'sonner';
+import { AuthProvider, useAuth } from '../contexts/AuthContext';
 
 interface AppContextType {
   isDarkMode: boolean;
@@ -19,6 +20,22 @@ export const AppContext = createContext<AppContextType>({
 });
 
 export const useAppContext = () => useContext(AppContext);
+
+// Bridge component to sync auth state with app context
+const AuthBridge: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+  const { isLoggedIn, setIsLoggedIn } = useAppContext();
+
+  useEffect(() => {
+    // Update app context login state based on Supabase auth
+    const shouldBeLoggedIn = !!user;
+    if (isLoggedIn !== shouldBeLoggedIn) {
+      setIsLoggedIn(shouldBeLoggedIn);
+    }
+  }, [user, isLoggedIn, setIsLoggedIn]);
+
+  return <>{children}</>;
+};
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -43,9 +60,13 @@ export default function App() {
   }
 
   return (
-    <AppContext.Provider value={{ isDarkMode, setIsDarkMode, isLoggedIn, setIsLoggedIn }}>
-      <RouterProvider router={router} />
-      <Toaster position="top-right" richColors />
-    </AppContext.Provider>
+    <AuthProvider>
+      <AppContext.Provider value={{ isDarkMode, setIsDarkMode, isLoggedIn, setIsLoggedIn }}>
+        <AuthBridge>
+          <RouterProvider router={router} />
+          <Toaster position="top-right" richColors />
+        </AuthBridge>
+      </AppContext.Provider>
+    </AuthProvider>
   );
 }

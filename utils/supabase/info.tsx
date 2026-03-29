@@ -2,14 +2,3 @@
 
 export const projectId = "umfmyaehpjsnyfqyiwsb"
 export const publicAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtZm15YWVocGpzbnlmcXlpd3NiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2OTg3MjYsImV4cCI6MjA5MDI3NDcyNn0.t5nVT5HmX2rvtJ0cep9EclgcahcaSYfBEQAoRHxUgdY"
-
-import { Resend } from 'resend';
-
-const resend = new Resend('re_Mnok9j1t_H9a1KXcaayduSjKVDq8Q53Am');
-
-await resend.emails.send({
-  from: 'onboarding@resend.dev', // default test email
-  to: 'your@email.com',
-  subject: 'Hello!',
-  html: '<p>Your email works 🎉</p>',
-});

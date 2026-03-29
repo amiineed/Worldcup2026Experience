@@ -17,7 +17,7 @@ export const sendEmail = async (options: EmailOptions) => {
     console.log('=== EMAIL DEBUG INFO ===');
     console.log('To:', options.to);
     console.log('Subject:', options.subject);
-    console.log('From:', options.from || 'onboarding@resend.dev');
+    console.log('From:', options.from || 'noreply@worldcup2026.com');
     console.log('HTML length:', options.html.length);
     console.log('EmailJS Public Key:', EMAILJS_PUBLIC_KEY);
     console.log('EmailJS Service ID:', EMAILJS_SERVICE_ID);
